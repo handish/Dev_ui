@@ -92,18 +92,22 @@ void Error_Handler(void);
 #define OUT1_CONFIG_GPIO_Port GPIOI
 #define DWN_BTN_Pin GPIO_PIN_7
 #define DWN_BTN_GPIO_Port GPIOK
+#define DWN_BTN_EXTI_IRQn EXTI9_5_IRQn
 #define SEL_BTN_Pin GPIO_PIN_6
 #define SEL_BTN_GPIO_Port GPIOK
+#define SEL_BTN_EXTI_IRQn EXTI9_5_IRQn
 #define UP_BTN_Pin GPIO_PIN_5
 #define UP_BTN_GPIO_Port GPIOK
+#define UP_BTN_EXTI_IRQn EXTI9_5_IRQn
 #define UI_INPUT1_Pin GPIO_PIN_13
 #define UI_INPUT1_GPIO_Port GPIOC
 #define SPARE_I2C_SDA_3V3_Pin GPIO_PIN_0
 #define SPARE_I2C_SDA_3V3_GPIO_Port GPIOF
 #define OUT2_CONFIG_Pin GPIO_PIN_6
 #define OUT2_CONFIG_GPIO_Port GPIOI
-#define BACK_BTN_Pin GPIO_PIN_4
-#define BACK_BTN_GPIO_Port GPIOK
+#define BCK_BTN_Pin GPIO_PIN_4
+#define BCK_BTN_GPIO_Port GPIOK
+#define BCK_BTN_EXTI_IRQn EXTI4_IRQn
 #define UI_INPUT2_Pin GPIO_PIN_4
 #define UI_INPUT2_GPIO_Port GPIOD
 #define SOC_UART_RX_3V3_Pin GPIO_PIN_2
@@ -241,7 +245,28 @@ void Error_Handler(void);
 #define SPARE_SW_EN_Pin GPIO_PIN_11
 #define SPARE_SW_EN_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
+/* Button Press Decode Defines */
+#define UP		1
+#define	DWN		2
+#define BACK	3
+#define SEL		4
 
+/* Button Flag definition (shared between Button Task and Navigation Task) */
+//extern uint8_t button_press;
+
+/* Navigation control defines */
+#define MAX_MENU_ITEMS	4
+#define MENU_TOP		1
+
+//extern uint8_t curr_highlight;
+
+#define NOTIFY_NOCLEAR		0x00
+#define	NOTIFY_CLEARALL		0xFF
+#define	NOTIFY_BTN_MASK		0x0F
+#define	NOTIFY_MENU_MASK	0xF0
+#define NOTIFY_MENU_BIT		4
+
+#define NO_BTN_PRESS		5
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

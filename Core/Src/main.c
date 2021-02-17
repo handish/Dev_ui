@@ -91,11 +91,19 @@ const osThreadAttr_t DatScreenBlink_attributes = {
   .priority = (osPriority_t) osPriorityNormal,
   .stack_size = 1000 * 4
 };
+/* Definitions for Navigation */
+osThreadId_t NavigationHandle;
+const osThreadAttr_t Navigation_attributes = {
+  .name = "Navigation",
+  .priority = (osPriority_t) osPriorityHigh,
+  .stack_size = 128 * 4
+};
 /* USER CODE BEGIN PV */
 uint16_t adc1_buf[ADC_BUF_LEN];
 uint16_t adc2_buf[ADC_BUF_LEN];
 uint16_t adc3_buf[ADC_BUF_LEN];
 uint8_t adcRestart[3];
+uint8_t inputButtonSet = NO_BTN_PRESS; //set to a higher value than any other button priority. 5 is the "unused" state
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,7 +130,9 @@ static void MX_DAC_Init(void);
 void startHeartbeat(void *argument);
 void startADCRead(void *argument);
 void GetDaScreenBlink(void *argument);
+void navigation_control(void *argument);
 
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 void uartTransmitChar(char *message,int uart);
 void uartTransmitInt(uint16_t *number, int uart);
@@ -221,6 +231,9 @@ int main(void)
   MX_SPI5_Init();
   MX_USB_OTG_FS_PCD_Init();
   MX_DAC_Init();
+
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
   //HAL_ADC_ConfigChannel();
   HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc1_buf, ADC_BUF_LEN);
@@ -315,6 +328,9 @@ int main(void)
 
   /* creation of DatScreenBlink */
   DatScreenBlinkHandle = osThreadNew(GetDaScreenBlink, NULL, &DatScreenBlink_attributes);
+
+  /* creation of Navigation */
+  NavigationHandle = osThreadNew(navigation_control, NULL, &Navigation_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -424,6 +440,20 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
+{
+  /* EXTI9_5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+  /* EXTI4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 }
 
 /**
@@ -1460,9 +1490,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DWN_BTN_Pin SEL_BTN_Pin UP_BTN_Pin BACK_BTN_Pin */
-  GPIO_InitStruct.Pin = DWN_BTN_Pin|SEL_BTN_Pin|UP_BTN_Pin|BACK_BTN_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  /*Configure GPIO pins : DWN_BTN_Pin SEL_BTN_Pin UP_BTN_Pin BCK_BTN_Pin */
+  GPIO_InitStruct.Pin = DWN_BTN_Pin|SEL_BTN_Pin|UP_BTN_Pin|BCK_BTN_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOK, &GPIO_InitStruct);
 
@@ -1755,7 +1785,7 @@ void startHeartbeat(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  HAL_GPIO_TogglePin(GPIOI,MCU_HEARTBEAT_Pin);
+	  //HAL_GPIO_TogglePin(GPIOI,MCU_HEARTBEAT_Pin);
 	  osDelay(500);
   }
 
@@ -1803,8 +1833,47 @@ void GetDaScreenBlink(void *argument)
 	 static uint16_t LCD_Blink_White = 0b0001100000000000;
 	 static uint16_t LCD_Blink_Black = 0b0001000000000000;
 	 int x = 0;
+	 uint32_t ulNotifiedValue;
+	 uint8_t button_val = 0;
+	 uint8_t menu_val = 0;
+
   for(;;)
   {
+	  xTaskNotifyWait(NOTIFY_NOCLEAR, NOTIFY_CLEARALL, &ulNotifiedValue, portMAX_DELAY);
+	  // button press decode
+	  button_val = (ulNotifiedValue & NOTIFY_BTN_MASK);
+	  menu_val = ((ulNotifiedValue & NOTIFY_MENU_MASK) >> NOTIFY_MENU_BIT);
+
+	  switch(button_val)
+	  {
+	  case UP:
+	  {
+		  // increment display indicator location on present menu
+		  uartTransmitChar("switch UP\r\n",7);
+		  break;
+	  }
+	  case DWN:
+	  {
+		  // decrement display indicator location on present menu
+		  uartTransmitChar("switch DOWN\r\n",7);
+		  break;
+	  }
+	  case BACK:
+	  {
+		  // change display state or menu
+		  uartTransmitChar("switch BACK\r\n",7);
+		  break;
+	  }
+	  case SEL:
+	  {
+		  // change display state or menu
+		  uartTransmitChar("switch SEL\r\n",7);
+		  break;
+	  }
+	  default:
+		  // no change in display indicator or state
+		  break;
+	  }
 	 	  if (!x) {
 	 		  //HAL_GPIO_WritePin(GPIOI,MCU_HEARTBEAT_Pin,GPIO_PIN_SET);
 	 		  x=1;
@@ -1825,6 +1894,90 @@ void GetDaScreenBlink(void *argument)
 	 	  osDelay(400);
   }
   /* USER CODE END GetDaScreenBlink */
+}
+
+/* USER CODE BEGIN Header_navigation_control */
+/**
+* @brief Function implementing the Navigation thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_navigation_control */
+void navigation_control(void *argument)
+{
+  /* USER CODE BEGIN navigation_control */
+		uint8_t curr_highlight = MENU_TOP;
+		//uint8_t button_press = 1;
+		// Clear button flags here
+
+	  /* Infinite loop */
+	  for(;;)
+	  {
+		switch(inputButtonSet)
+		{
+		case UP:
+		{
+			if (curr_highlight == MENU_TOP)
+			{
+				//do nothing
+			}
+			else
+			{
+				curr_highlight = curr_highlight - 1;
+				// task notify the display task with UP and current highlighted item
+				// task notification U32 bits defined as:
+				// [0:3]: menu button flags [0]:UP, [1]:DWN, [2]:SEL, [3]:Reserved
+				// [4:7]: menu selection flags
+				xTaskNotify(DatScreenBlinkHandle, (UP | (curr_highlight << NOTIFY_MENU_BIT)), eSetBits);
+			}
+			break;
+		}
+		case DWN:
+		{
+			if (curr_highlight > MAX_MENU_ITEMS)
+			{
+				//do nothing
+			}
+			else
+			{
+				curr_highlight = curr_highlight + 1;
+				// task notify the display task with DWN and current highlighted item
+				// task notification U32 bits defined as:
+				// [0:3]: menu button flags [0]:UP, [1]:DWN, [2]:SEL, [3]:Reserved
+				// [4:7]: menu selection flags
+				xTaskNotify(DatScreenBlinkHandle, (DWN | (curr_highlight << NOTIFY_MENU_BIT)), eSetBits);
+			}
+			break;
+		}
+		case BACK:
+		{
+			//run_menu = curr_highlight;
+			// task notify the display task with SEL and what menu to run
+			// task notification U32 bits defined as:
+			// [0:3]: menu button flags [0]:UP, [1]:DWN, [2]:SEL, [3]:Reserved
+			// [4:7]: menu selection flags
+			xTaskNotify(DatScreenBlinkHandle, (BACK | (curr_highlight << NOTIFY_MENU_BIT)), eSetBits);
+			break;
+		}
+		case SEL:
+		{
+			//run_menu = curr_highlight;
+			// task notify the display task with SEL and what menu to run
+			// task notification U32 bits defined as:
+			// [0:3]: menu button flags [0]:UP, [1]:DWN, [2]:SEL, [3]:Reserved
+			// [4:7]: menu selection flags
+			xTaskNotify(DatScreenBlinkHandle, (SEL | (curr_highlight << NOTIFY_MENU_BIT)), eSetBits);
+			break;
+		}
+		default:
+			// task notify the display task with no button press?
+			break;
+		}
+		inputButtonSet = NO_BTN_PRESS;
+	    osDelay(700);
+	  }
+
+  /* USER CODE END navigation_control */
 }
 
  /**
