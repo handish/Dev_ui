@@ -1552,6 +1552,13 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+int __io_putchar(int ch)
+{
+	HAL_UART_Transmit(&huart7, (uint8_t *)&ch, 1, 0xFFFF);
+
+	return ch;
+}
+
 void uartTransmitChar(char *message, int uart){
 	char uart_buf[200];
 	int uart_buf_len;
@@ -1836,61 +1843,124 @@ void GetDaScreenBlink(void *argument)
 	 uint32_t ulNotifiedValue;
 	 uint8_t button_val = 0;
 	 uint8_t menu_val = 0;
+	 uint8_t running_menu = 0;
 
   for(;;)
   {
+	  ulNotifiedValue = 0;
 	  xTaskNotifyWait(NOTIFY_NOCLEAR, NOTIFY_CLEARALL, &ulNotifiedValue, portMAX_DELAY);
 	  // button press decode
 	  button_val = (ulNotifiedValue & NOTIFY_BTN_MASK);
 	  menu_val = ((ulNotifiedValue & NOTIFY_MENU_MASK) >> NOTIFY_MENU_BIT);
+	  running_menu = ((ulNotifiedValue & NOTIFY_RUN_MENU_MASK) >> NOTIFY_MENU_RUN_BIT);
+//	  printf("uNotifiedValue %d\r\n", ulNotifiedValue);
+//	  printf("running_menu: %d\r\n", running_menu);
+//	  printf("highlighed menu: %d\n\r", menu_val);
+//	  printf("button_press: %d\r\n", button_val);
+
+	  // If the BACK button was pressed, just run the SEL button case with the previous menu
+	  if (button_val == BACK)
+	  {
+		  button_val = SEL;
+	  }
 
 	  switch(button_val)
 	  {
 	  case UP:
 	  {
 		  // increment display indicator location on present menu
-		  uartTransmitChar("switch UP\r\n",7);
+		  printf("switch UP\r\n");
+		  //uartTransmitChar("switch UP\r\n",7);
+		  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
+		  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_White, 1, 100);
+		  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
 		  break;
 	  }
 	  case DWN:
 	  {
 		  // decrement display indicator location on present menu
-		  uartTransmitChar("switch DOWN\r\n",7);
+		  printf("switch DWN\r\n");
+		  //uartTransmitChar("switch DOWN\r\n",7);
+		  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_SET);
+		  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_Black, 1, 100);
+		  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_RESET);
 		  break;
 	  }
 	  case BACK:
 	  {
 		  // change display state or menu
-		  uartTransmitChar("switch BACK\r\n",7);
+		  printf("switch BACK\r\n");
+		  //uartTransmitChar("switch BACK\r\n",7);
 		  break;
 	  }
 	  case SEL:
 	  {
 		  // change display state or menu
-		  uartTransmitChar("switch SEL\r\n",7);
+		  printf("switch SEL\r\n");
+		  //uartTransmitChar("switch SEL\r\n",7);
+		  switch(running_menu)
+		  {
+		  case BOOT_MENU:
+		  {
+			  printf("BOOT_MENU\r\n");
+			  //uartTransmitChar("switch BOOT_MENU\r\n",7);
+			  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_SET);
+			  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_Black, 1, 100);
+			  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_RESET);
+			  break;
+		  }
+		  case MAIN_MENU:
+		  {
+			  printf("MAIN_MENU\r\n");
+			  //uartTransmitChar("switch MAIN_MENU\r\n",7);
+			  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
+			  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_White, 1, 100);
+			  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
+			  break;
+		  }
+		  case STATUS_MENU:
+		  {
+			  printf("STATUS_MENU\r\n");
+			  //uartTransmitChar("switch STATUS_MENU\r\n",7);
+			  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_SET);
+			  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_Black, 1, 100);
+			  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_RESET);
+			  break;
+		  }
+		  case SYSTEM_INFO_MENU:
+		  {
+			  printf("SYSTEM INFO MENU\r\n");
+			  //uartTransmitChar("switch SYSTEM INFO_MENU\r\n",7);
+			  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
+			  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_White, 1, 100);
+			  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
+			  break;
+		  }
+		  }
 		  break;
 	  }
 	  default:
 		  // no change in display indicator or state
+		  //uartTransmitChar("switch NO BTN PRESS\r\n",7);
 		  break;
 	  }
-	 	  if (!x) {
-	 		  //HAL_GPIO_WritePin(GPIOI,MCU_HEARTBEAT_Pin,GPIO_PIN_SET);
-	 		  x=1;
-
-	 		  uartTransmitChar("hello\r\n",7);
-	 		  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
-	 		  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_White, 1, 100);
-	 		  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
-	 	  }
-	 	  else{
-	 		  //HAL_GPIO_WritePin(GPIOI,MCU_HEARTBEAT_Pin,GPIO_PIN_RESET);
-	 		  x=0;
-	 		  uartTransmitChar("here\r\n",7);
-	 		  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_SET);
-	 		  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_Black, 1, 100);
-	 		  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_RESET);
-	 	  }
+//	 	  if (!x) {
+//	 		  //HAL_GPIO_WritePin(GPIOI,MCU_HEARTBEAT_Pin,GPIO_PIN_SET);
+//	 		  x=1;
+//
+//	 		  uartTransmitChar("hello\r\n",7);
+//	 		  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
+//	 		  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_White, 1, 100);
+//	 		  HAL_GPIO_TogglePin(LCD_SS_GPIO_Port,LCD_SS_Pin);
+//	 	  }
+//	 	  else{
+//	 		  //HAL_GPIO_WritePin(GPIOI,MCU_HEARTBEAT_Pin,GPIO_PIN_RESET);
+//	 		  x=0;
+//	 		  uartTransmitChar("here\r\n",7);
+//	 		  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_SET);
+//	 		  HAL_SPI_Transmit(&hspi4, (uint16_t *)&LCD_Blink_Black, 1, 100);
+//	 		  HAL_GPIO_WritePin(LCD_SS_GPIO_Port,LCD_SS_Pin,GPIO_PIN_RESET);
+//	 	  }
 	 	  osDelay(400);
   }
   /* USER CODE END GetDaScreenBlink */
@@ -1906,7 +1976,9 @@ void GetDaScreenBlink(void *argument)
 void navigation_control(void *argument)
 {
   /* USER CODE BEGIN navigation_control */
-		uint8_t curr_highlight = MENU_TOP;
+		uint8_t menu_highlight = MENU_TOP;	// variable indicates what menu item is currently being highlighted
+		uint8_t	menu_run = BOOT_MENU;		// variable to track what menu is currently running
+		uint8_t prev_menu = menu_run;		// variable to track what the previous menu running was, this is used for the BACK button
 		//uint8_t button_press = 1;
 		// Clear button flags here
 
@@ -1917,60 +1989,72 @@ void navigation_control(void *argument)
 		{
 		case UP:
 		{
-			if (curr_highlight == MENU_TOP)
+			if (menu_highlight == MENU_TOP)
 			{
 				//do nothing
 			}
 			else
 			{
-				curr_highlight = curr_highlight - 1;
+				menu_highlight = menu_highlight - 1;
 				// task notify the display task with UP and current highlighted item
 				// task notification U32 bits defined as:
 				// [0:3]: menu button flags [0]:UP, [1]:DWN, [2]:SEL, [3]:Reserved
-				// [4:7]: menu selection flags
-				xTaskNotify(DatScreenBlinkHandle, (UP | (curr_highlight << NOTIFY_MENU_BIT)), eSetBits);
+				// [4:7]: menu indicator highlight flags
+				// [8:11]: currently running menu flags
+				xTaskNotify(DatScreenBlinkHandle, (UP | (menu_highlight << NOTIFY_MENU_BIT) | (menu_run << NOTIFY_MENU_RUN_BIT)), eSetValueWithoutOverwrite);
 			}
 			break;
 		}
 		case DWN:
 		{
-			if (curr_highlight > MAX_MENU_ITEMS)
+			if (menu_highlight >= MAX_MENU_ITEMS)
 			{
 				//do nothing
 			}
 			else
 			{
-				curr_highlight = curr_highlight + 1;
+				menu_highlight = menu_highlight + 1;
 				// task notify the display task with DWN and current highlighted item
 				// task notification U32 bits defined as:
 				// [0:3]: menu button flags [0]:UP, [1]:DWN, [2]:SEL, [3]:Reserved
 				// [4:7]: menu selection flags
-				xTaskNotify(DatScreenBlinkHandle, (DWN | (curr_highlight << NOTIFY_MENU_BIT)), eSetBits);
+				// [8:11]: currently running menu flags
+				// [12:15]: previously running menu flags
+				xTaskNotify(DatScreenBlinkHandle, (DWN | (menu_highlight << NOTIFY_MENU_BIT) | (menu_run << NOTIFY_MENU_RUN_BIT)), eSetValueWithoutOverwrite);
 			}
 			break;
 		}
 		case BACK:
 		{
-			//run_menu = curr_highlight;
+			menu_run = prev_menu;
 			// task notify the display task with SEL and what menu to run
 			// task notification U32 bits defined as:
 			// [0:3]: menu button flags [0]:UP, [1]:DWN, [2]:SEL, [3]:Reserved
 			// [4:7]: menu selection flags
-			xTaskNotify(DatScreenBlinkHandle, (BACK | (curr_highlight << NOTIFY_MENU_BIT)), eSetBits);
+			// [8:11]: currently running menu flags
+			// [12:15]: previously running menu flags
+			xTaskNotify(DatScreenBlinkHandle, (BACK | (menu_highlight << NOTIFY_MENU_BIT) | (menu_run << NOTIFY_MENU_RUN_BIT)), eSetValueWithoutOverwrite);
 			break;
 		}
 		case SEL:
 		{
-			//run_menu = curr_highlight;
+			prev_menu = menu_run;		// save currently running menu for BACK button
+			menu_run = menu_highlight;	// update the currently running menu to what the user SELECTED
+//			printf("menu_run: %d\r\n", menu_run);
+//			printf("prev_menu: %d\r\n", prev_menu);
+//			printf("menu_run_adjust: %d\r\n", (menu_run << NOTIFY_MENU_RUN_BIT));
 			// task notify the display task with SEL and what menu to run
 			// task notification U32 bits defined as:
 			// [0:3]: menu button flags [0]:UP, [1]:DWN, [2]:SEL, [3]:Reserved
 			// [4:7]: menu selection flags
-			xTaskNotify(DatScreenBlinkHandle, (SEL | (curr_highlight << NOTIFY_MENU_BIT)), eSetBits);
+			// [8:11]: currently running menu flags
+			// [12:15]: previously running menu flags
+			xTaskNotify(DatScreenBlinkHandle, (SEL | (menu_highlight << NOTIFY_MENU_BIT) | (menu_run << NOTIFY_MENU_RUN_BIT)), eSetValueWithoutOverwrite);
 			break;
 		}
 		default:
-			// task notify the display task with no button press?
+			// task notify the display task with no button press.  Just refresh the current running menu.
+			xTaskNotify(DatScreenBlinkHandle, (NO_BTN_PRESS | (menu_highlight << NOTIFY_MENU_BIT) | (menu_run << NOTIFY_MENU_RUN_BIT)), eSetValueWithoutOverwrite);
 			break;
 		}
 		inputButtonSet = NO_BTN_PRESS;

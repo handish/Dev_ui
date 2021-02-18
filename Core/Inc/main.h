@@ -260,11 +260,18 @@ void Error_Handler(void);
 
 //extern uint8_t curr_highlight;
 
-#define NOTIFY_NOCLEAR		0x00
-#define	NOTIFY_CLEARALL		0xFF
-#define	NOTIFY_BTN_MASK		0x0F
-#define	NOTIFY_MENU_MASK	0xF0
-#define NOTIFY_MENU_BIT		4
+#define NOTIFY_NOCLEAR			0x00
+#define	NOTIFY_CLEARALL			0xFF
+#define	NOTIFY_BTN_MASK			0x0F
+#define	NOTIFY_MENU_MASK		0xF0
+#define NOTIFY_RUN_MENU_MASK	0xF00
+#define NOTIFY_MENU_BIT			4
+#define NOTIFY_MENU_RUN_BIT		8
+
+#define BOOT_MENU			1
+#define MAIN_MENU			2
+#define	STATUS_MENU			3
+#define	SYSTEM_INFO_MENU	4
 
 #define NO_BTN_PRESS		5
 /* USER CODE END Private defines */
